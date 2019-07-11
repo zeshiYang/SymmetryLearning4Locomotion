@@ -4,14 +4,9 @@ from tensorboardX  import SummaryWriter
 from model import *
 
 if __name__ == "__main__":
-    import pybullet_envs
-    import gym
     from gym_biped.envs.bipedEnv import *
-    #env = gym.make("Walker2d-v2")
     env = bipedEnv(False)
     env.setKpandKd(1000)
-
-    #env.isRender = False
     env.reset()
     actor = Actor(env.observation_space.shape[0], env.action_space.shape[0], env.action_space, hidden=[128, 64])
     critic = Critic(env.observation_space.shape[0], 0, 3/(1-0.99), hidden =[128, 64])

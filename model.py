@@ -102,8 +102,6 @@ class Actor(nn.Module):
 
     # initialize final layer weight to be [INIT, INIT]
     self.fca = orthogonal_init(nn.Linear(input_dim, a_dim), 0.01)
-    #nn.init.uniform_(self.fca.weight, -INIT_ACTOR_SCALE, INIT_ACTOR_SCALE)
-    #nn.init.constant_(self.fca.bias, 0)
 
     # set a_norm not trainable
     self.a_min = torch.Tensor(a_bound.low)

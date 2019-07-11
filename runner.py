@@ -149,15 +149,8 @@ class Runner(object):
     def setExpRate(self, exp_rate):
         self.exp_rate = exp_rate
 
-    def testModel(self, num_epoch =10,render=False, mode=0):
-       
-        if(mode==0):
-            self.env.pdCon.kp[0, 0]=0
-            self.env.pdCon.kp[2, 2]=0
-            self.env.pdCon.kd[0, 0]=0
-            self.env.pdCon.kd[2, 2]=0
-        #print(self.env.pdCon.kp)
-        #print(self.env.pdCon.kd)
+    def testModel(self, num_epoch =10,render=False):
+ 
         with torch.no_grad():
             rwd_acc=0
             test_step=0
@@ -178,18 +171,6 @@ class Runner(object):
                 obs_norm = self.s_norm(obs)
                 while(not done):
                     ac = self.actor(obs_norm).numpy()
-                    '''print(obs)
-                    print(ac1)
-                    obs = torch.mm(M, obs.view(-1, 1)).view(-1)
-                    obs_norm = self.s_norm(obs)
-                    ac2 = self.actor(obs_norm)#.numpy()
-                    print(obs)
-                    print(ac2)
-                    print(torch.mm(N, ac1.view(-1,1)) - ac2.view(-1,1))
-                    print("#####")
-                    ac = ac2.view(-1).numpy()'''
-
-
                     obs, rwd, done , info = self.env.step(ac)
                     #print(obs[-1])
                     if(render==True):
@@ -237,16 +218,9 @@ if __name__ == "__main__":
     env.reset()
    
     s_norm, actor, critic = load_model("./Walker2d-Bullet-curriculum-5-50/checkpoint_1920.tar")
-    #actor = Actor(env.observation_space.shape[0], env.action_space.shape[0], env.action_space, hidden=[128, 64])
-    #critic = Critic(env.observation_space.shape[0], 0, 3/(1-0.99), hidden =[128, 64])
-    #s_norm = Normalizer(env.observation_space.shape[0])
     runner =  Runner(env, s_norm, actor, critic, 4096, 0.99, 0.95, 1)
-    #runner.env.pdCon.kp[0, 0]=0
-    #runner.env.pdCon.kd[0, 0]=1000
-    #runner.env.pdCon.kp[2, 2]=1000
-    #runner.env.pdCon.kd[2, 2]=100
     runner.env.setKpandKd(0)
-    print(runner.testModel(mode=1))
+    runner.testModel(1)
 
 
       

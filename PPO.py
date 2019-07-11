@@ -7,10 +7,7 @@ from runner import *
 import os
 from tensorboardX import SummaryWriter
 
-def adjust_learning_rate(optimizer, num_sample, num_samples, init_lr):
-    lr = init_lr*(1-num_sample/num_samples)
-    for param_group in optimizer.param_groups:
-        param_group['lr'] = lr
+
 def adjust_KpandKd(env, alpha):
     kp = env.pdCon.init_kp.copy()
     env.setKpandKd(kp[2, 2]*alpha)
@@ -44,20 +41,13 @@ def PPO(save_path,
         M_action = torch.Tensor(runner.env.M_action).float()
         M_state = torch.Tensor(runner.env.M_state).float()
 
-        rwd_threshold = 280
+        #important settings for curriculum learning
+        rwd_threshold = 180
         full_assist_flag = False
 
 
         for i in range(ppo_epoch):
-            num_sample += runner.sample_size
-            #clip_param*=exp_rate
-            #adjust_learning_rate(optimizer_actor, num_sample, num_samples, lr_actor)
-            #adjust_learning_rate(optimizer_critic, num_sample, num_samples, lr_critic)
-            #adjust_KpandKd(runner.env, 0, num_samples, np.array([0,1000,1000, 1000]))
-            #print(runner.env.pdCon.kp[2,2])
-            #print(runner.env.pdCon.kd)
-
-           
+            num_sample += runner.sample_size           
             rollouts = runner.run()
             obs = rollouts["obs"] 
             acs = rollouts["acs"]
@@ -152,13 +142,9 @@ def PPO(save_path,
                 
 
             num_updates = num_epoch * num_mini_batch
-
             value_loss_epoch /= num_updates
             action_loss_epoch /= num_updates
             symmetry_loss_epoch /= num_updates
-            #print("iter:{}".format(i))
-            #print("action_loss:{}".format(action_loss_epoch))
-            #print("value_loss:{}".format(value_loss_epoch))
 
             if(i%10==0):
               data = {"actor": actor.state_dict(),
@@ -168,7 +154,7 @@ def PPO(save_path,
               torch.save(data, save_path+"/checkpoint_"+str(i)+".tar")
             if(i%10==0):
               print("iter:{}".format(i))
-              rwd_acc, test_step, rwd_action, rwd_upright, rwd_foot, rwd_vel, rwd_alive = runner.testModel(mode=1)
+              rwd_acc, test_step, rwd_action, rwd_upright, rwd_foot, rwd_vel, rwd_alive = runner.testModel( )
               print("symmetry loss:{}".format(symmetry_loss_epoch))
               print("kp_init:{}".format(runner.env.pdCon.init_kd[0, 0]))
               if(rwd_acc>rwd_threshold):
@@ -176,9 +162,7 @@ def PPO(save_path,
                       full_assist_flag = True
                       rwd_threshold*=0.7
                   adjust_KpandKd(runner.env, 0.75)
-              #rwd_test , step_test= runner.testModel(mode=0)
-              #print("test_rwd:{}".format(rwd_test))
-              #print("test_step:{}".format(step_test))
+         
               print("actor_std:{}".format(torch.exp(actor.a_std).detach().numpy()))
               print("######################")
               #debug log

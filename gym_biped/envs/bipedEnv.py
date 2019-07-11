@@ -33,33 +33,18 @@ class pdController(object):
 
     def getForce(self, targetPos, vel):
         pos_now, vel_now = self.getPosandVel()
-
         targetPos = np.array([0]*3 + targetPos.tolist())
-
         targetPos[0] = pos_now[0]
-
         vel = np.array([vel, 0, 0, 0, 0, 0, 0, 0, 0])
-
         pos_part = self.kp.dot(pos_now - targetPos)
-
         vel_part = self.kd.dot(vel_now)
-
         M = p.calculateMassMatrix(self.bipedId, pos_now.tolist())
-
         M = np.array(M)
-
         M = (M + self.kd * self.timeStep)
-
         c = p.calculateInverseDynamics(self.bipedId, pos_now.tolist(), vel_now.tolist(), [0]*9)
-
         c = np.array(c)
-
         b = -pos_part - vel_part -self.kp.dot(vel_now)*self.timeStep - c
-       
-        qddot = np.linalg.solve(M, b)
-
-
-      
+        qddot = np.linalg.solve(M, b)      
         tau = -pos_part - vel_part - self.kd.dot(qddot) * self.timeStep-self.kp.dot(vel_now)*self.timeStep + self.kd.dot(vel)
 
         return tau
@@ -95,7 +80,7 @@ class bipedEnv(gym.Env):
         self.observation_space = spaces.Box(low = -np.inf, high = np.inf, shape = (21, ))
         self.scale_action = np.array([math.pi/2, math.pi/2, math.pi/2, math.pi/2
         , 0.5, 0.5])
-        self.episode_length = 100
+        self.episode_length = 50
         self.vel =0
         self.vel_target = 5.0
         self.pos_current = 0
@@ -105,6 +90,7 @@ class bipedEnv(gym.Env):
         self.w_action = 1
         self.w_velocity = 3
         self.w_live = 1
+        self.live_bonus = 7
         self.w_upright = 1
         self.w_foot_lift =0.0
         self.w_jump = 0.0
@@ -147,19 +133,13 @@ class bipedEnv(gym.Env):
         self.pdCon.kd[2, 2] =0.1*kpandkd
         self.pdCon.kd[0, 0] =kpandkd
 
-        self.vel = np.min([2*self.num_step*0.06, self.vel_target])
-
-        #print("vel:{}".format(self.vel))
-        #print("kp:{}".format(self.pdCon.kd[0, 0]))
+        self.vel = np.min([2*self.num_step*self.timeStep*self.num_substep, self.vel_target])
         self.pos_prev =  p.getLinkState(self.bipedId, 2,  physicsClientId=self.clientId)[0][1]
 
         action_real = action * self.scale_action      
-        #ction_real[2]-=math.pi/4
-        #action_real[3]-=math.pi/4
         joint_idx = np.arange(self.pdCon.num_joints).tolist()
         for i in range(self.num_substep):
             forces = self.pdCon.getForce(action_real, self.vel).tolist()
-            #print(forces)
             p.setJointMotorControlArray(self.bipedId, joint_idx, p.TORQUE_CONTROL, forces= forces)
             p.stepSimulation(physicsClientId=self.clientId)
             if(self.renders==True):
@@ -170,7 +150,6 @@ class bipedEnv(gym.Env):
 
         self.pos_current =  p.getLinkState(self.bipedId, 2,  physicsClientId=self.clientId)[0][1]
         obv = self.getObv()
-        #print("current_vel:{}".format((self.pos_current - self.pos_prev)/(self.num_substep*self.timeStep)))
         rwd_action, rwd_live, rwd_upright, rwd_vel, rwd_foot, rwd_jump = self.getRwd(action, obv)
         done = self.getDone(obv)
         rwd = self.w_action*rwd_action + self.w_live* rwd_live + self.w_upright*rwd_upright + self.w_velocity*rwd_vel + self.w_foot_lift*rwd_foot + self.w_jump*rwd_jump
@@ -201,7 +180,6 @@ class bipedEnv(gym.Env):
         self.num_step = 0
         self.pdCon.kp = self.pdCon.init_kp.copy()
         self.pdCon_kd = self.pdCon.init_kd.copy()
-        self.vel = 1.0
         return self.getObv()
 
     def getObv(self):
@@ -216,7 +194,6 @@ class bipedEnv(gym.Env):
         obv += [pos_leftfoot[1], pos_leftfoot[2]]
         obv += [pos_rightfoot[1], pos_rightfoot[2]]
         root_vel = p.getLinkState(self.bipedId, 2, computeLinkVelocity=1, physicsClientId=self.clientId)[6][1]
-        #print(root_vel)
         obv += [root_vel]
         obv+=[self.vel]
         obv = np.array(obv)
@@ -226,7 +203,6 @@ class bipedEnv(gym.Env):
         vel = (self.pos_current - self.pos_prev)/(self.num_substep*self.timeStep)
         rwd_vel = -abs(vel - self.vel)
         rwd_action = -np.linalg.norm(action)
-        rwd_live = 7 
         rwd_upright = -abs(obv[0])
         pos_leftleg = np.array(p.getLinkState(self.bipedId, 4, physicsClientId=self.clientId)[0])
         pos_rightleg = np.array(p.getLinkState(self.bipedId, 3, physicsClientId=self.clientId)[0])
@@ -239,12 +215,11 @@ class bipedEnv(gym.Env):
         #print("live:{}".format(rwd_live))
         #print("upright:{}".format(rwd_upright))
         
-        return rwd_action, rwd_live, rwd_upright, rwd_vel, rwd_foot, rwd_jump
+        return rwd_action, self.live_bonus, rwd_upright, rwd_vel, rwd_foot, rwd_jump
 
     def getDone(self, obv):
 
         return not((self.num_step<self.episode_length) and (obv[0]> -0.4) and (obv[0]<0.2) and  (np.isfinite(obv).all())
-        #return not((abs(obv[0])<1.2) and (np.isfinite(obv).all())
         and (abs(obv[14]-1.09)<0.2))
 
     def getSymmetryState(self, state):
@@ -299,13 +274,6 @@ if __name__ == "__main__":
         action=np.array(action)  
         #action = env.action_space.sample()      
         obv, rwd, done, info =env.step(action)
-        #print("obv:{}".format(obv))
-        #print("obv_mirror:{}".format(env.getSymmetryState(obv)))
-        #print("done :{}".format(done))
-        #print("height:{}".format(obv[14]))
-        #print("rwd:{}".format(rwd))
-        done = False
-
         if(done == True):
             env.reset()
          
