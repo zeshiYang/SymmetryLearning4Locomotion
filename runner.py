@@ -217,7 +217,7 @@ if __name__ == "__main__":
     env = bipedEnv(True)
     env.reset()
    
-    s_norm, actor, critic = load_model("./Walker2d-Bullet-curriculum-5-50/checkpoint_1920.tar")
+    s_norm, actor, critic = load_model("./Walker2d-Bullet-curriculum-1-50/checkpoint_1920.tar")
     runner =  Runner(env, s_norm, actor, critic, 4096, 0.99, 0.95, 1)
     runner.env.setKpandKd(0)
     runner.testModel(1)

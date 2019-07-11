@@ -82,7 +82,7 @@ class bipedEnv(gym.Env):
         , 0.5, 0.5])
         self.episode_length = 50
         self.vel =0
-        self.vel_target = 5.0
+        self.vel_target = 1.0
         self.pos_current = 0
         self.pos_prev = 0
 
@@ -90,7 +90,7 @@ class bipedEnv(gym.Env):
         self.w_action = 1
         self.w_velocity = 3
         self.w_live = 1
-        self.live_bonus = 7
+        self.live_bonus = 4
         self.w_upright = 1
         self.w_foot_lift =0.0
         self.w_jump = 0.0
@@ -266,14 +266,14 @@ if __name__ == "__main__":
     for i in range(6):
         para.append(p.addUserDebugParameter(name[i], -1, 1, 0))
     while(1):
-        embed()
         action=[]
         for i in range(6):
             action.append(p.readUserDebugParameter(para[i]))
-        action = [0]*6
+        #action = [0]*6
         action=np.array(action)  
         #action = env.action_space.sample()      
         obv, rwd, done, info =env.step(action)
+        done = False
         if(done == True):
             env.reset()
          
